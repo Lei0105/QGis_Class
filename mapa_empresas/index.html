@@ -15,6 +15,7 @@ html,body,#map{height:100%;margin:0;font-family:Arial,Helvetica,sans-serif}
 .panel summary{cursor:pointer;font-weight:700;font-size:13px}
 .row{display:flex;align-items:flex-start;gap:8px;margin:5px 0;font-size:12px;line-height:1.25}
 .swatch{width:12px;height:12px;border-radius:50%;margin-top:1px;flex:0 0 12px;border:1px solid rgba(0,0,0,.18)}
+.region-swatch{border-radius:2px}
 .count{margin-left:auto;color:#777}
 .leaflet-popup-content{margin:10px 12px;min-width:220px}
 .popup-title{font-weight:700;font-size:14px;margin-bottom:6px;color:#222}
@@ -32,20 +33,18 @@ html,body,#map{height:100%;margin:0;font-family:Arial,Helvetica,sans-serif}
   <h1>Empresas grandes en Yucatán</h1>
   <div class="sub">DENUE · 603 establecimientos · mapa interactivo</div>
   <details open><summary>Capas</summary>
-    <label class="row"><input id="toggleMunicipios" type="checkbox" checked> <span>Límites municipales</span></label>
     <label class="row"><input id="toggleRegiones" type="checkbox" checked> <span>Regiones</span></label>
   </details>
   <details open><summary>Sectores</summary><div id="sectorList"></div></details>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="municipios.js"></script><script src="regiones.js"></script><script src="empresas.js"></script><script src="config.js"></script>
+<script src="reg_1.js"></script><script src="reg_2.js"></script><script src="reg_3.js"></script><script src="emp_1.js"></script><script src="emp_2.js"></script><script src="emp_3.js"></script><script src="emp_4.js"></script><script src="emp_5.js"></script><script src="emp_6.js"></script><script src="config.js"></script>
 <script>
 const map=L.map('map',{zoomControl:true}).setView([20.75,-89.15],8);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 async function ungzipJSON(b64){const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));return JSON.parse(await new Response(stream).text());}
-Promise.all([ungzipJSON(DATA_MUNICIPIOS),ungzipJSON(DATA_REGIONES),ungzipJSON(DATA_EMPRESAS),ungzipJSON(DATA_CONFIG)]).then(([municipios,regiones,empresas,cfg])=>{
-  const municipiosLayer=L.geoJSON(municipios,{style:{color:'#555',weight:.7,fillColor:'#c43c39',fillOpacity:.035},onEachFeature:(f,l)=>l.bindTooltip(f.properties.NOMGEO,{sticky:true})}).addTo(map);
+Promise.all([ungzipJSON(DATA_REGIONES),ungzipJSON(DATA_EMPRESAS),ungzipJSON(DATA_CONFIG)]).then(([regiones,empresas,cfg])=>{
   const regionesLayer=L.geoJSON(regiones,{style:f=>({color:f.properties.color,weight:2.2,fillColor:f.properties.color,fillOpacity:.09}),onEachFeature:(f,l)=>l.bindTooltip(f.properties.nom_reg,{sticky:true})}).addTo(map);
   const grouped={}, counts={};
   for(const f of empresas.features){ const s=String(f.properties.sector??''); (grouped[s]??=[]).push(f); counts[s]=(counts[s]||0)+1; }
@@ -63,9 +62,8 @@ Promise.all([ungzipJSON(DATA_MUNICIPIOS),ungzipJSON(DATA_REGIONES),ungzipJSON(DA
     list.appendChild(label);
   });
   list.addEventListener('change',e=>{if(!e.target.dataset.sector)return; const lyr=sectorLayers[e.target.dataset.sector]; e.target.checked?lyr.addTo(map):map.removeLayer(lyr);});
-  document.getElementById('toggleMunicipios').addEventListener('change',e=>e.target.checked?municipiosLayer.addTo(map):map.removeLayer(municipiosLayer));
   document.getElementById('toggleRegiones').addEventListener('change',e=>e.target.checked?regionesLayer.addTo(map):map.removeLayer(regionesLayer));
-  const bounds=municipiosLayer.getBounds(); if(bounds.isValid()) map.fitBounds(bounds.pad(.03));
+  const bounds=regionesLayer.getBounds(); if(bounds.isValid()) map.fitBounds(bounds.pad(.03));
 }).catch(err=>{console.error(err);document.getElementById('panel').insertAdjacentHTML('beforeend','<p style="color:#b00020;font-size:12px">No se pudieron cargar las capas.</p>')});
 </script>
 </body></html>
