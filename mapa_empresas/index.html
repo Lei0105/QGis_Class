@@ -48,23 +48,44 @@ Promise.all([ungzipJSON(DATA_REGIONES),ungzipJSON(DATA_EMPRESAS),ungzipJSON(DATA
     const name=String(f.properties.nom_reg??'Región');
     (regionGroups[name]??=[]).push(f);
   }
+
+  // Las siete regiones corresponden a las capas originales del proyecto QGIS.
+  const regionOrder=[
+    'Región I Poniente',
+    'Región II Noroeste',
+    'Región III Centro',
+    'Región IV Litoral Centro',
+    'Región V Noreste',
+    'Región VI Oriente',
+    'Región VII Sur'
+  ];
+
   const regionLayers={};
   const regionList=document.getElementById('regionList');
-  Object.keys(regionGroups).forEach(name=>{
-    const features=regionGroups[name];
+
+  regionOrder.forEach(name=>{
+    const features=regionGroups[name]||[];
+    if(!features.length)return;
     const color=features[0]?.properties?.color||'#666';
+
     const lyr=L.geoJSON({type:'FeatureCollection',features},{
       style:{color:color,weight:2.2,fillColor:color,fillOpacity:.09},
-      onEachFeature:(f,l)=>l.bindTooltip(f.properties.nom_reg,{sticky:true})
+      onEachFeature:(f,l)=>l.bindTooltip(name,{sticky:true})
     }).addTo(map);
+
     regionLayers[name]=lyr;
-    const label=document.createElement('label'); label.className='row';
+
+    const label=document.createElement('label');
+    label.className='row';
     label.innerHTML=`<input type="checkbox" checked data-region="${esc(name)}"><span class="swatch region-swatch" style="background:${color}"></span><span>${esc(name)}</span>`;
     regionList.appendChild(label);
   });
+
   regionList.addEventListener('change',e=>{
-    if(!e.target.dataset.region)return;
-    const lyr=regionLayers[e.target.dataset.region];
+    const name=e.target.dataset.region;
+    if(!name)return;
+    const lyr=regionLayers[name];
+    if(!lyr)return;
     e.target.checked?lyr.addTo(map):map.removeLayer(lyr);
   });
 
