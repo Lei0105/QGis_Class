@@ -32,9 +32,7 @@ html,body,#map{height:100%;margin:0;font-family:Arial,Helvetica,sans-serif}
 <div class="panel" id="panel">
   <h1>DENUE - Empresas en Yucatán</h1>
   <div class="sub">DENUE · 603 establecimientos · mapa interactivo</div>
-  <details open><summary>Capas</summary>
-    <label class="row"><input id="toggleRegiones" type="checkbox" checked> <span>Regiones</span></label>
-  </details>
+  <details open><summary>Regiones</summary><div id="regionList"></div></details>
   <details open><summary>Sectores</summary><div id="sectorList"></div></details>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -45,7 +43,31 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,att
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
 async function ungzipJSON(b64){const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));return JSON.parse(await new Response(stream).text());}
 Promise.all([ungzipJSON(DATA_REGIONES),ungzipJSON(DATA_EMPRESAS),ungzipJSON(DATA_CONFIG)]).then(([regiones,empresas,cfg])=>{
-  const regionesLayer=L.geoJSON(regiones,{style:f=>({color:f.properties.color,weight:2.2,fillColor:f.properties.color,fillOpacity:.09}),onEachFeature:(f,l)=>l.bindTooltip(f.properties.nom_reg,{sticky:true})}).addTo(map);
+  const regionGroups={};
+  for(const f of regiones.features){
+    const name=String(f.properties.nom_reg??'Región');
+    (regionGroups[name]??=[]).push(f);
+  }
+  const regionLayers={};
+  const regionList=document.getElementById('regionList');
+  Object.keys(regionGroups).forEach(name=>{
+    const features=regionGroups[name];
+    const color=features[0]?.properties?.color||'#666';
+    const lyr=L.geoJSON({type:'FeatureCollection',features},{
+      style:{color:color,weight:2.2,fillColor:color,fillOpacity:.09},
+      onEachFeature:(f,l)=>l.bindTooltip(f.properties.nom_reg,{sticky:true})
+    }).addTo(map);
+    regionLayers[name]=lyr;
+    const label=document.createElement('label'); label.className='row';
+    label.innerHTML=`<input type="checkbox" checked data-region="${esc(name)}"><span class="swatch region-swatch" style="background:${color}"></span><span>${esc(name)}</span>`;
+    regionList.appendChild(label);
+  });
+  regionList.addEventListener('change',e=>{
+    if(!e.target.dataset.region)return;
+    const lyr=regionLayers[e.target.dataset.region];
+    e.target.checked?lyr.addTo(map):map.removeLayer(lyr);
+  });
+
   const grouped={}, counts={};
   for(const f of empresas.features){ const s=String(f.properties.sector??''); (grouped[s]??=[]).push(f); counts[s]=(counts[s]||0)+1; }
   const sectorLayers={};
@@ -62,8 +84,7 @@ Promise.all([ungzipJSON(DATA_REGIONES),ungzipJSON(DATA_EMPRESAS),ungzipJSON(DATA
     list.appendChild(label);
   });
   list.addEventListener('change',e=>{if(!e.target.dataset.sector)return; const lyr=sectorLayers[e.target.dataset.sector]; e.target.checked?lyr.addTo(map):map.removeLayer(lyr);});
-  document.getElementById('toggleRegiones').addEventListener('change',e=>e.target.checked?regionesLayer.addTo(map):map.removeLayer(regionesLayer));
-  const bounds=regionesLayer.getBounds(); if(bounds.isValid()) map.fitBounds(bounds.pad(.03));
+  const bounds=L.geoJSON(regiones).getBounds(); if(bounds.isValid()) map.fitBounds(bounds.pad(.03));
 }).catch(err=>{console.error(err);document.getElementById('panel').insertAdjacentHTML('beforeend','<p style="color:#b00020;font-size:12px">No se pudieron cargar las capas.</p>')});
 </script>
 </body></html>
