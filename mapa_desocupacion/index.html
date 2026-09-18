@@ -16,7 +16,7 @@ html,body,#map{height:100%;margin:0;font-family:Arial,Helvetica,sans-serif}#map{
 <button class="layer-toggle" id="layerToggle" type="button" aria-label="Mostrar u ocultar capas" aria-expanded="false"><span class="layer-icon"><i></i><i></i><i></i></span></button>
 <div class="panel" id="panel"><h1>Población Desocupada en Yucatán</h1><div class="sub">Porcentaje de población desocupada por municipio</div><label class="row"><input id="toggleLayer" type="checkbox" checked><span>Población Desocupada</span></label><label class="row"><input id="toggleLabels" type="checkbox" checked><span>Etiquetas municipales</span></label><div class="legend-title">PDES (%)</div><div id="legend"></div></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="des_1.js"></script><script src="des_2.js"></script><script src="des_3.js"></script>
+<script src="municipios.js"></script><script src="datos.js"></script>
 <script>
 const map=L.map('map',{zoomControl:true}).setView([20.78,-89.15],8);
 L.tileLayer('https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',{maxZoom:20,attribution:'&copy; Google'}).addTo(map);
@@ -31,11 +31,49 @@ const ranges=[
 function color(v){for(let i=0;i<ranges.length;i++){const r=ranges[i];if(v>=r.min&&(v<r.max||i===ranges.length-1&&v<=r.max))return r.color}return '#ccc'}
 async function ungzipJSON(b64){const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));return JSON.parse(await new Response(stream).text())}
 const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
-ungzipJSON(DATA_DES).then(data=>{
- const labels=L.layerGroup();
- const layer=L.geoJSON(data,{style:f=>({color:'#232323',weight:.7,fillColor:color(Number(f.properties.PDES)),fillOpacity:.82}),onEachFeature:(f,l)=>{const p=f.properties;l.bindPopup(`<div class="popup-title">${esc(p.NOMGEO)}</div><div class="popup-grid"><b>Población desocupada:</b> ${Number(p.PDES).toFixed(2)}%<br><b>Población ocupada:</b> ${Number(p.PO).toFixed(2)}%</div>`);const c=l.getBounds().getCenter();L.marker(c,{interactive:false,icon:L.divIcon({className:'municipio-label',html:esc(p.NOMGEO),iconSize:null})}).addTo(labels)}}).addTo(map);labels.addTo(map);
- document.getElementById('toggleLayer').addEventListener('change',e=>e.target.checked?layer.addTo(map):map.removeLayer(layer));document.getElementById('toggleLabels').addEventListener('change',e=>e.target.checked?labels.addTo(map):map.removeLayer(labels));
- map.fitBounds([[19.55,-90.55],[21.65,-87.45]],{padding:[10,10]});
-}).catch(console.error);
+ungzipJSON(DATA_MUNICIPIOS).then(data=>{
+  for(const f of data.features){
+    const key=String(f.properties.CVEGEO||f.properties.cvegeo||'');
+    const d=DATOS_DESOCUPACION[key];
+    if(d){
+      f.properties.PO=d.PO;
+      f.properties.PDES=d.PDES;
+    }
+  }
+
+  const labels=L.layerGroup();
+  const layer=L.geoJSON(data,{
+    style:f=>({
+      color:'#232323',
+      weight:.7,
+      fillColor:color(Number(f.properties.PDES)),
+      fillOpacity:.82
+    }),
+    onEachFeature:(f,l)=>{
+      const p=f.properties;
+      l.bindPopup(`<div class="popup-title">${esc(p.NOMGEO)}</div><div class="popup-grid"><b>Población desocupada:</b> ${Number(p.PDES).toFixed(2)}%<br><b>Población ocupada:</b> ${Number(p.PO).toFixed(2)}%</div>`);
+      const center=l.getBounds().getCenter();
+      L.marker(center,{
+        interactive:false,
+        icon:L.divIcon({className:'municipio-label',html:esc(p.NOMGEO),iconSize:null})
+      }).addTo(labels);
+    }
+  }).addTo(map);
+
+  labels.addTo(map);
+
+  document.getElementById('toggleLayer').addEventListener('change',e=>
+    e.target.checked?layer.addTo(map):map.removeLayer(layer)
+  );
+  document.getElementById('toggleLabels').addEventListener('change',e=>
+    e.target.checked?labels.addTo(map):map.removeLayer(labels)
+  );
+
+  const bounds=layer.getBounds();
+  if(bounds.isValid()) map.fitBounds(bounds.pad(.02));
+}).catch(err=>{
+  console.error(err);
+  panel.insertAdjacentHTML('beforeend','<p style="color:#b00020;font-size:12px">No se pudo cargar la capa municipal.</p>');
+});
 const legend=document.getElementById('legend');ranges.forEach(r=>{const d=document.createElement('div');d.className='row';d.innerHTML=`<span class="swatch" style="background:${r.color}"></span><span>${r.label}</span>`;legend.appendChild(d)});
 </script></body></html>
