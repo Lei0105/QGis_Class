@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Población Desocupada en Yucatán</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+html,body,#map{height:100%;margin:0;font-family:Arial,Helvetica,sans-serif}#map{background:#eef2f4}
+.panel{position:absolute;z-index:1000;top:56px;right:12px;width:min(320px,calc(100vw - 24px));max-height:calc(100vh - 68px);overflow:auto;background:rgba(255,255,255,.96);border-radius:10px;box-shadow:0 2px 12px rgba(0,0,0,.22);padding:12px 14px;box-sizing:border-box;display:none}.panel.open{display:block}
+.panel h1{font-size:18px;margin:0 0 4px;color:#333}.panel .sub{font-size:12px;color:#666;margin-bottom:10px}.row{display:flex;align-items:center;gap:8px;margin:7px 0;font-size:12px}.swatch{width:18px;height:12px;flex:0 0 18px;border:1px solid #232323}.count{margin-left:auto;color:#777}.legend-title{font-weight:700;font-size:13px;border-top:1px solid #e5e5e5;padding-top:9px;margin-top:9px}
+.layer-toggle{position:absolute;z-index:1001;top:12px;right:12px;width:36px;height:36px;border:0;border-radius:4px;background:#2f80ed;box-shadow:0 1px 5px rgba(0,0,0,.25);cursor:pointer;padding:0}.layer-toggle:hover{background:#1f6ed4}.layer-icon{position:relative;display:block;width:22px;height:22px;margin:auto}.layer-icon i{position:absolute;left:4px;width:14px;height:9px;border:2px solid #fff;border-radius:1px;transform:skewY(-28deg) rotate(30deg);background:transparent}.layer-icon i:nth-child(1){top:2px}.layer-icon i:nth-child(2){top:7px}.layer-icon i:nth-child(3){top:12px}
+.home{position:absolute;z-index:1000;left:12px;top:12px;background:#fff;color:#333;text-decoration:none;border-radius:8px;padding:8px 11px;box-shadow:0 1px 8px rgba(0,0,0,.22);font-size:13px}.municipio-label{background:transparent;border:0;box-shadow:none;color:#323232;font-size:10px;font-weight:500;text-shadow:0 0 2px #fff,0 0 2px #fff,0 0 2px #fff;padding:0}.leaflet-tooltip.municipio-label:before{display:none}.leaflet-popup-content{margin:10px 12px;min-width:210px}.popup-title{font-weight:700;font-size:14px;margin-bottom:6px}.popup-grid{font-size:12px;line-height:1.5}
+@media(max-width:700px){.panel{width:min(300px,calc(100vw - 24px));max-height:calc(100vh - 68px)}}
+</style></head>
+<body><a class="home" href="../">← Mapas</a><div id="map"></div>
+<button class="layer-toggle" id="layerToggle" type="button" aria-label="Mostrar u ocultar capas" aria-expanded="false"><span class="layer-icon"><i></i><i></i><i></i></span></button>
+<div class="panel" id="panel"><h1>Población Desocupada en Yucatán</h1><div class="sub">Porcentaje de población desocupada por municipio</div><label class="row"><input id="toggleLayer" type="checkbox" checked><span>Población Desocupada</span></label><label class="row"><input id="toggleLabels" type="checkbox" checked><span>Etiquetas municipales</span></label><div class="legend-title">PDES (%)</div><div id="legend"></div></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="des_1.js"></script><script src="des_2.js"></script><script src="des_3.js"></script>
+<script>
+const map=L.map('map',{zoomControl:true}).setView([20.78,-89.15],8);
+L.tileLayer('https://mt1.google.com/vt/lyrs=p&x={x}&y={y}&z={z}',{maxZoom:20,attribution:'&copy; Google'}).addTo(map);
+const panel=document.getElementById('panel'),toggle=document.getElementById('layerToggle');toggle.addEventListener('click',()=>{const o=panel.classList.toggle('open');toggle.setAttribute('aria-expanded',String(o));});document.addEventListener('click',e=>{if(panel.classList.contains('open')&&!panel.contains(e.target)&&!toggle.contains(e.target)){panel.classList.remove('open');toggle.setAttribute('aria-expanded','false')}});
+const ranges=[
+{min:0.168079447,max:1.109312156,label:'0.168 - 1.109',color:'#f7fcf0'},
+{min:1.109312156,max:1.259102056,label:'1.109 - 1.259',color:'#e0f3db'},
+{min:1.259102056,max:1.3858527335,label:'1.259 - 1.386',color:'#a8ddb5'},
+{min:1.3858527335,max:1.484488773,label:'1.386 - 1.484',color:'#4eb3d3'},
+{min:1.484488773,max:1.684345495,label:'1.484 - 1.684',color:'#0868ac'},
+{min:1.684345495,max:5.532263114,label:'1.684 - 5.532',color:'#084081'}];
+function color(v){for(let i=0;i<ranges.length;i++){const r=ranges[i];if(v>=r.min&&(v<r.max||i===ranges.length-1&&v<=r.max))return r.color}return '#ccc'}
+async function ungzipJSON(b64){const bytes=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));return JSON.parse(await new Response(stream).text())}
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+ungzipJSON(DATA_DES).then(data=>{
+ const labels=L.layerGroup();
+ const layer=L.geoJSON(data,{style:f=>({color:'#232323',weight:.7,fillColor:color(Number(f.properties.PDES)),fillOpacity:.82}),onEachFeature:(f,l)=>{const p=f.properties;l.bindPopup(`<div class="popup-title">${esc(p.NOMGEO)}</div><div class="popup-grid"><b>Población desocupada:</b> ${Number(p.PDES).toFixed(2)}%<br><b>Población ocupada:</b> ${Number(p.PO).toFixed(2)}%</div>`);const c=l.getBounds().getCenter();L.marker(c,{interactive:false,icon:L.divIcon({className:'municipio-label',html:esc(p.NOMGEO),iconSize:null})}).addTo(labels)}}).addTo(map);labels.addTo(map);
+ document.getElementById('toggleLayer').addEventListener('change',e=>e.target.checked?layer.addTo(map):map.removeLayer(layer));document.getElementById('toggleLabels').addEventListener('change',e=>e.target.checked?labels.addTo(map):map.removeLayer(labels));
+ map.fitBounds([[19.55,-90.55],[21.65,-87.45]],{padding:[10,10]});
+}).catch(console.error);
+const legend=document.getElementById('legend');ranges.forEach(r=>{const d=document.createElement('div');d.className='row';d.innerHTML=`<span class="swatch" style="background:${r.color}"></span><span>${r.label}</span>`;legend.appendChild(d)});
+</script></body></html>
